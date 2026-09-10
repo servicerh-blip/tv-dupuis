@@ -1,1 +1,65 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Test Radio Nova</title><style>html,body{height:100%;margin:0;font-family:Arial;background:#173447;color:#fff}main{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center}button{font-size:30px;font-weight:bold;padding:22px 34px;border:0;border-radius:14px}audio{width:80%;max-width:700px}#s{font-size:20px}</style></head><body><main><h1>TEST RADIO NOVA</h1><button id="b">▶ TESTER RADIO NOVA</button><audio id="a" controls preload="none" src="https://novazz.ice.infomaniak.ch/novazz-128.mp3"></audio><div id="s">Clique sur le bouton pour tester le son.</div></main><script>const a=document.getElementById("a"),s=document.getElementById("s");document.getElementById("b").onclick=async()=>{s.textContent="Connexion…";try{await a.play();s.textContent="✅ Radio Nova est en lecture."}catch(e){s.textContent="❌ Lecture refusée : "+e.message}};a.onplaying=()=>s.textContent="✅ Radio Nova est en lecture.";a.onerror=()=>s.textContent="❌ Impossible de charger le flux audio.";</script></body></html>
+<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>TV DUPUIS</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:Arial}
+iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
+#go{position:fixed;inset:0;z-index:20;border:0;background:#173447;color:white;font-size:38px;font-weight:bold}
+#st{position:fixed;right:10px;bottom:8px;z-index:10;background:#000a;color:#ddd;padding:6px 9px;border-radius:6px;font-size:12px}
+</style></head><body>
+<iframe id="f" allow="autoplay; fullscreen" allowfullscreen></iframe>
+<audio id="a" preload="none" src="https://novazz.ice.infomaniak.ch/novazz-128.mp3"></audio>
+<div id="st">Prêt</div><button id="go">▶ DÉMARRER LA DIFFUSION</button>
+<script>
+const CSV='https://docs.google.com/spreadsheets/d/e/2PACX-1vT2KiSmUgCSQZJ_yZDWA8YrHqQHOkRsHBo0wGzDBPheg3FdbX9Z_Io2HsRBQOEd1nda67XJyy_rT5vN/pub?gid=0&single=true&output=csv', BASE='https://docs.google.com/presentation/d/e/2PACX-1vSTdRp0N1qXTgEc7l1cAhU9uTG3USLqnDKvFoRWHvW58mXTO3d8vOa5COHZ85L576-2v6UR2M12wQZe/embed?start=false&loop=false&delayms=60000';
+const IDS={1: 'p', 2: 'g3fa5c669f90_0_0', 3: 'g3fa749bc0b5_0_0', 4: 'g3fa5c669f90_0_6', 5: 'g3fa881198f9_0_1', 6: 'g3fa881198f9_0_7', 7: 'g3fa881198f9_0_13', 8: 'g3fa881198f9_0_19', 9: 'g3fa749bc0b5_0_6'};
+const f=document.getElementById('f'), a=document.getElementById('a'), st=document.getElementById('st');
+
+function csvParse(t) {
+ let rows=[], row=[], cell='', q=false;
+ for(let i=0;i<t.length;i++){let c=t[i],n=t[i+1];
+  if(c=='"'&&q&&n=='"'){cell+='"';i++;}
+  else if(c=='"') q=!q;
+  else if(c==','&&!q){row.push(cell);cell='';}
+  else if((c=='\n'||c=='\r')&&!q){if(c=='\r'&&n=='\n')i++;row.push(cell);if(row.some(x=>x!==''))rows.push(row);row=[];cell='';}
+  else cell+=c;
+ }
+ row.push(cell);if(row.some(x=>x!==''))rows.push(row);return rows;
+}
+const yes=v=>['TRUE','VRAI','OUI','1','X'].includes(String(v||'').trim().toUpperCase());
+function dmy(s){if(!s)return null;let p=s.trim().split('/');return p.length==3?new Date(+p[2],+p[1]-1,+p[0]):null}
+function mins(s,def){if(!s)return def;let p=s.trim().split(':');return (+p[0])*60+(+p[1]||0)}
+function active(r,now){
+ if(!yes(r[0]))return false;
+ const day=(now.getDay()+6)%7; if(!yes(r[3+day]))return false;
+ let ds=dmy(r[10]),de=dmy(r[11]),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+ if(ds&&today<ds)return false;if(de&&today>de)return false;
+ let m=now.getHours()*60+now.getMinutes();
+ return m>=mins(r[12],0)&&m<=mins(r[13],1439);
+}
+let list=[],i=0,timer;
+async function load(){
+ st.textContent='Lecture du planning…';
+ const res=await fetch(CSV+(CSV.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});
+ if(!res.ok)throw new Error('Sheet '+res.status);
+ let all=csvParse(await res.text()); list=all.slice(1).filter(r=>active(r,new Date()));
+ if(!list.length)throw new Error('Aucune diapo active maintenant');
+ i=0;show();
+}
+async function radio(on){
+ if(on){a.muted=false;try{if(a.paused)await a.play()}catch(e){}}
+ else{a.pause();a.muted=true;}
+}
+function show(){
+ clearTimeout(timer);if(!list.length)return;
+ let r=list[i%list.length], num=parseInt(r[1]), sid=IDS[num], sec=Math.max(5,parseInt(r[14])||30), ron=yes(r[15]);
+ if(!sid){st.textContent='Diapo '+num+' non raccordée';i++;timer=setTimeout(show,5000);return}
+ radio(ron);
+ f.src=BASE+'#slide=id.'+sid;
+ st.textContent='Diapo '+num+' • '+sec+' s • Radio '+(ron?'OUI':'NON');
+ timer=setTimeout(async()=>{i++; if(i%list.length===0){try{await load();return}catch(e){}} show();},sec*1000);
+}
+document.getElementById('go').onclick=async function(){
+ this.style.display='none';
+ try{await a.play();await load();}catch(e){st.textContent='Erreur planning : '+e.message;this.style.display='block';this.textContent='↻ RÉESSAYER';}
+};
+</script></body></html>
