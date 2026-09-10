@@ -1,23 +1,34 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TV DUPUIS – Test Slides</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TV DUPUIS – Slides + Nova</title>
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:Arial,sans-serif}
 iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000}
 button{position:fixed;inset:0;z-index:10;border:0;background:#173447;color:#fff;font-size:38px;font-weight:bold;cursor:pointer}
+#status{position:fixed;right:15px;bottom:10px;z-index:5;color:#aaa;font-size:13px}
 </style>
 </head>
 <body>
 <iframe id="slides" allow="autoplay; fullscreen" allowfullscreen></iframe>
-<button id="go">▶ DÉMARRER LE TEST</button>
+<audio id="nova" preload="none" loop></audio>
+<div id="status">Prêt</div>
+<button id="go">▶ DÉMARRER LA DIFFUSION</button>
 <script>
-document.getElementById('go').onclick=function(){
-  this.style.display='none';
-  document.getElementById('slides').src='https://docs.google.com/presentation/d/e/2PACX-1vSTdRp0N1qXTgEc7l1cAhU9uTG3USLqnDKvFoRWHvW58mXTO3d8vOa5COHZ85L576-2v6UR2M12wQZe/embed?start=true&loop=true&delayms=10000';
+const slides=document.getElementById('slides');
+const nova=document.getElementById('nova');
+const status=document.getElementById('status');
+document.getElementById('go').onclick=async function(){
+ this.style.display='none';
+ slides.src='https://docs.google.com/presentation/d/e/2PACX-1vSTdRp0N1qXTgEc7l1cAhU9uTG3USLqnDKvFoRWHvW58mXTO3d8vOa5COHZ85L576-2v6UR2M12wQZe/embed?start=true&loop=true&delayms=10000';
+ nova.src='https://novazz.ice.infomaniak.ch/novazz-128.mp3';
+ try {
+   await nova.play();
+   status.textContent='Radio Nova • en lecture';
+ } catch(e) {
+   status.textContent='Diaporama OK • radio bloquée par le navigateur';
+ }
 };
 </script>
-</body>
-</html>
+</body></html>
