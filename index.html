@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TV DUPUIS – Planning</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:Arial,sans-serif}
+#frame{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000}
+#start{position:fixed;inset:0;z-index:99;border:0;background:#173447;color:white;font-size:38px;font-weight:700}
+#status{position:fixed;bottom:8px;right:10px;z-index:10;background:rgba(0,0,0,.45);color:#fff;padding:5px 8px;border-radius:6px;font-size:12px;opacity:.45}
+</style>
+</head>
+<body>
+<iframe id="frame" allow="autoplay; fullscreen" allowfullscreen></iframe>
+<audio id="radio" preload="none"></audio>
+<button id="start">▶ DÉMARRER LA DIFFUSION</button>
+<div id="status">Prêt</div>
+<script>
+const CSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vT2KiSmUgCSQZJ_yZDWA8YrHqQHOkRsHBo0wGzDBPheg3FdbX9Z_Io2HsRBQOEd1nda67XJyy_rT5vN/pub?gid=0&single=true&output=csv";
+const PUB="https://docs.google.com/presentation/d/e/2PACX-1vSTdRp0N1qXTgEc7l1cAhU9uTG3USLqnDKvFoRWHvW58mXTO3d8vOa5COHZ85L576-2v6UR2M12wQZe/pub?start=false&loop=false&delayms=60000";
+const RADIO="https://novazz.ice.infomaniak.ch/novazz-128.mp3";
+const IDS={"1": "p", "2": "g3fa5c669f90_0_0", "3": "g3fa749bc0b5_0_0", "4": "g3fa5c669f90_0_6", "5": "g3fa881198f9_0_1", "6": "g3fa881198f9_0_7", "7": "g3fa881198f9_0_13", "8": "g3fa881198f9_0_19", "9": "g3fa749bc0b5_0_6"};
+const frame=document.getElementById('frame'), radio=document.getElementById('radio'),
+      start=document.getElementById('start'), statusEl=document.getElementById('status');
+
+function n(v){return (v??'').toString().trim();}
+function oui(v){return ['true','vrai','oui','1','x','✓','☑'].includes(n(v).toLowerCase());}
+function csvParse(t){
+  let rows=[], row=[], v='', q=false;
+  for(let i=0;i<t.length;i++){let c=t[i], nx=t[i+1];
+    if(c=='"'&&q&&nx=='"'){v+='"';i++;}
+    else if(c=='"')q=!q;
+    else if(c==','&&!q){row.push(v);v='';}
+    else if((c=='\n'||c=='\r')&&!q){if(c=='\r'&&nx=='\n')i++;row.push(v);v='';if(row.some(x=>x!==''))rows.push(row);row=[];}
+    else v+=c;
+  }
+  if(v||row.length){row.push(v);rows.push(row);}
+  let h=rows.shift().map(x=>n(x).toLowerCase());
+  return rows.map(r=>Object.fromEntries(h.map((k,i)=>[k,n(r[i])])));
+}
+function dfr(s,end=false){
+  if(!s)return null; let m=s.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/); if(!m)return null;
+  return new Date(+m[3],+m[2]-1,+m[1],end?23:0,end?59:0,end?59:0);
+}
+function hm(s,f){if(!s)return f; let m=s.match(/(\d{1,2}):(\d{2})/); return m?+m[1]*60 + +m[2]:f;}
+function active(r,now=new Date()){
+  if(!oui(r['actif']))return false;
+  let a=dfr(r['date début']), b=dfr(r['date fin'],true);
+  if(a&&now<a||b&&now>b)return false;
+  let dn=['dim','lun','mar','mer','jeu','ven','sam'][now.getDay()];
+  if(!oui(r[dn]))return false;
+  let m=now.getHours()*60+now.getMinutes();
+  return m>=hm(r['heure début'],0)&&m<=hm(r['heure fin'],1439);
+}
+async function load(){
+  let res=await fetch(CSV+'&_='+Date.now(),{cache:'no-store'});
+  if(!res.ok)throw new Error('planning');
+  return csvParse(await res.text());
+}
+async function setRadio(on){
+  if(on){
+    if(!radio.src)radio.src=RADIO;
+    radio.muted=false; radio.volume=1;
+    try{await radio.play();}catch(e){}
+  } else {
+    radio.muted=true; radio.pause(); radio.currentTime=0;
+  }
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function cycle(){
+  let pos=0, data=[];
+  while(true){
+    try{data=await load();}catch(e){statusEl.textContent='Planning inaccessible — nouvel essai'; await sleep(30000); continue;}
+    let list=data.filter(active);
+    if(!list.length){await setRadio(false); frame.src='about:blank'; statusEl.textContent='Aucun contenu programmé'; await sleep(60000); continue;}
+    if(pos>=list.length)pos=0;
+    let r=list[pos++], num=parseInt(r['diapo'],10), id=IDS[num];
+    if(!id){statusEl.textContent='Diapo '+num+' non raccordée'; await sleep(5000); continue;}
+    let radioOn=n(r['radio']).toUpperCase()==='OUI';
+    await setRadio(radioOn);
+    let sec=Math.max(5,parseInt(r['durée (sec)']||'30',10));
+    statusEl.textContent='Diapo '+num+' • '+sec+' s • Radio '+(radioOn?'OUI':'NON');
+    frame.src=PUB+'#slide=id.'+encodeURIComponent(id);
+    await sleep(sec*1000);
+  }
+}
+start.onclick=async()=>{start.style.display='none'; try{await radio.play();radio.pause();}catch(e){} cycle();};
+</script>
+</body>
+</html>
